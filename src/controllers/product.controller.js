@@ -20,14 +20,21 @@ exports.getProducts = async (req, res, next) => {
     // Build query
     const query = {};
 
-    // Filter by category
-    if (category) query.category = category;
+    // Filter by category (only if valid ObjectId; ignore "undefined" string)
+    const isValidObjectId = (v) => typeof v === 'string' && v.length === 24 && /^[a-fA-F0-9]+$/.test(v);
+    if (category && category !== 'undefined' && isValidObjectId(category)) {
+      query.category = category;
+    }
 
-    // Filter by price range
-    if (minPrice || maxPrice) {
+    // Filter by price range (only add when values are valid numbers; never pass NaN to Mongoose)
+    const minNum = minPrice !== undefined && minPrice !== null && minPrice !== '' ? Number(minPrice) : null;
+    const maxNum = maxPrice !== undefined && maxPrice !== null && maxPrice !== '' ? Number(maxPrice) : null;
+    const minValid = minNum !== null && Number.isFinite(minNum);
+    const maxValid = maxNum !== null && Number.isFinite(maxNum);
+    if (minValid || maxValid) {
       query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      if (minValid) query.price.$gte = minNum;
+      if (maxValid) query.price.$lte = maxNum;
     }
 
     // Filter by status
@@ -36,9 +43,9 @@ exports.getProducts = async (req, res, next) => {
     // Filter by featured
     if (featured) query.featured = featured === 'true';
 
-    // Search
-    if (search) {
-      query.$text = { $search: search };
+    // Search (ignore "undefined" string and empty)
+    if (search && search !== 'undefined' && String(search).trim()) {
+      query.$text = { $search: String(search).trim() };
     }
 
     // Execute query with pagination
